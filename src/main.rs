@@ -61,7 +61,7 @@ struct InstallerApp {
 
 impl eframe::App for InstallerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Avvio automatico download
+
         if !self.started {
             self.started = true;
             let logs = self.logs.clone();
@@ -75,7 +75,6 @@ impl eframe::App for InstallerApp {
             });
         }
 
-        // GUI log con dimensioni adattive
         egui::CentralPanel::default().show(ctx, |ui| {
             let logs_text = self.logs.lock().unwrap().clone();
             let available_height = ui.available_height();
@@ -92,7 +91,7 @@ impl eframe::App for InstallerApp {
                 });
         });
 
-        ctx.request_repaint(); // aggiorna log in tempo reale
+        ctx.request_repaint();
     }
 }
 
@@ -103,16 +102,13 @@ async fn check_and_run(
     let local_versions = target_dir.join("version.txt");
     let launcher_path = target_dir.join(LAUNCHER_EXE);
 
-    // Check if launcher and local version.txt exist
     let has_local_installation = launcher_path.exists() && local_versions.exists();
 
     if has_local_installation {
         log(&logs, "Local installation found".to_string());
 
-        // Read local version
         let local_version = std::fs::read_to_string(&local_versions).ok();
 
-        // Try to verify online version
         log(&logs, "Checking for updates...".to_string());
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(5))
@@ -135,7 +131,7 @@ async fn check_and_run(
                 }
             }
             Ok(_) => {
-                // Non-successful response (404, 500, etc.)
+
                 log(
                     &logs,
                     "Server error, launching local version...".to_string(),
@@ -144,7 +140,7 @@ async fn check_and_run(
                 return Ok(());
             }
             Err(_) => {
-                // Offline or network error
+
                 log(&logs, "Cannot verify updates (offline?)".to_string());
                 log(&logs, "Launching local version...".to_string());
                 launch_and_exit(logs, &launcher_path, &target_dir).await?;
@@ -155,10 +151,8 @@ async fn check_and_run(
         log(&logs, "First installation".to_string());
     }
 
-    // Download and installation
     download_all(logs.clone()).await?;
 
-    // Download and save version.txt
     log(&logs, "Downloading version.txt...".to_string());
     let client = Client::new();
     match client.get(VERSIONS_URL).send().await {
@@ -181,12 +175,11 @@ async fn check_and_run(
         }
     }
 
-    // Launch launcher
     if launcher_path.exists() {
         #[cfg(unix)]
         {
             check_and_install_dependencies(&logs).await?;
-            // Ensure executable permission
+
             if let Ok(metadata) = std::fs::metadata(&launcher_path) {
                 let mut perms = metadata.permissions();
                 perms.set_mode(0o755);
@@ -210,17 +203,17 @@ async fn launch_and_exit(
 
     #[cfg(windows)]
     {
-        // On Windows use cmd /c start to launch completely independent
+
         std::process::Command::new("cmd")
             .args(&["/C", "start", "", launcher_path.to_str().unwrap()])
             .current_dir(target_dir)
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .creation_flags(0x08000000)
             .spawn()?;
     }
 
     #[cfg(unix)]
     {
-        // On Linux just spawn the process
+
         std::process::Command::new(launcher_path)
             .current_dir(target_dir)
             .spawn()?;
@@ -253,7 +246,6 @@ async fn download_all(
             } else {
                 log(&logs, format!("Completed: {}", file));
 
-                // If it's a zip, extract it
                 if file.ends_with(".zip") {
                     log(&logs, format!("Extracting: {}", file));
                     if let Err(e) = extract_zip(&path) {
@@ -261,7 +253,6 @@ async fn download_all(
                     } else {
                         log(&logs, format!("Extracted: {}", file));
 
-                        // Delete zip after extraction
                         if let Err(e) = std::fs::remove_file(&path) {
                             log(&logs, format!("Error removing zip: {}", e));
                         } else {
@@ -361,11 +352,10 @@ async fn check_and_install_dependencies(
 
     let mut missing = Vec::new();
 
-    // Map library names to package names based on distro
     let (secret_pkg, json_pkg) = match distro.as_str() {
         "fedora" | "centos" | "rhel" => ("libsecret", "jsoncpp"),
         "arch" | "manjaro" => ("libsecret", "jsoncpp"),
-        _ => ("libsecret-1-0", "libjsoncpp-dev"), // Ubuntu/Debian default
+        _ => ("libsecret-1-0", "libjsoncpp-dev"),
     };
 
     if !is_library_present("libsecret-1") {
@@ -387,7 +377,6 @@ async fn check_and_install_dependencies(
         install_packages(logs, &missing).await?;
     }
 
-    // Handle libjsoncpp symlink if necessary
     handle_jsoncpp_symlink(logs)?;
 
     Ok(())
@@ -406,7 +395,7 @@ fn is_library_present(name: &str) -> bool {
         let stdout = String::from_utf8_lossy(&out.stdout);
         stdout.contains(name)
     } else {
-        // Fallback: search in common library directories if ldconfig fails
+
         let common_dirs = ["/usr/lib", "/usr/lib64", "/lib", "/lib64"];
         for dir in common_dirs {
             if let Ok(entries) = std::fs::read_dir(dir) {
@@ -527,7 +516,6 @@ fn handle_jsoncpp_symlink(
         return Ok(());
     }
 
-    // Ordina per versione (priorità alla più recente)
     found_libs.sort_by(|a, b| b.1.cmp(&a.1));
 
     let (dir, v) = &found_libs[0];
@@ -540,11 +528,10 @@ fn handle_jsoncpp_symlink(
         ),
     );
 
-    // Versioni di compatibilità che vogliamo assicurarci esistano
     let targets = ["24", "25", "26"];
 
     for target_v in targets {
-        // Se la versione trovata inizia con target_v (es. v="25" e target="25"), saltiamo
+
         if v.starts_with(target_v)
             && (v.len() == target_v.len() || v.as_bytes()[target_v.len()] == b'.')
         {
@@ -600,19 +587,16 @@ fn ensure_self_relocation() -> Result<(), Box<dyn std::error::Error>> {
     let current_exe = std::env::current_exe()?;
     let target_dir = get_flux_dir();
 
-    // Create target dir if it doesn't exist
     if !target_dir.exists() {
         std::fs::create_dir_all(&target_dir)?;
     }
 
     let target_exe = target_dir.join(UPDATER_EXE);
 
-    // Check if we are already in the target dir and have the right name
     if current_exe == target_exe {
         return Ok(());
     }
 
-    // Copy itself to target location
     std::fs::copy(&current_exe, &target_exe)?;
 
     #[cfg(unix)]
@@ -623,15 +607,12 @@ fn ensure_self_relocation() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::set_permissions(&target_exe, perms)?;
     }
 
-    // Launch the new copy
     std::process::Command::new(target_exe).spawn()?;
 
-    // Create shortcut
     if let Err(e) = create_shortcut() {
         eprintln!("Shortcut creation error: {}", e);
     }
 
-    // Exit current process
     std::process::exit(0);
 }
 
@@ -640,7 +621,6 @@ fn create_shortcut() -> Result<(), Box<dyn std::error::Error>> {
     let target_exe = target_dir.join(UPDATER_EXE);
     let icon_path = target_dir.join("flux.ico");
 
-    // Ensure icon exists in .flux
     if !icon_path.exists() {
         let icon_bytes = include_bytes!("../flux.ico");
         std::fs::write(&icon_path, icon_bytes)?;
@@ -660,7 +640,7 @@ fn create_shortcut() -> Result<(), Box<dyn std::error::Error>> {
 
         let _ = std::process::Command::new("powershell")
             .args(&["-Command", &script])
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .creation_flags(0x08000000)
             .status();
     }
 
@@ -709,7 +689,7 @@ fn load_icon() -> egui::IconData {
 }
 
 fn main() {
-    // Relocation check
+
     if let Err(e) = ensure_self_relocation() {
         eprintln!("Relocation error: {}", e);
     }
