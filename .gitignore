@@ -1,0 +1,11 @@
+push.bat
+
+/target/
+target/
+**/*.rs.bk
+*.log
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

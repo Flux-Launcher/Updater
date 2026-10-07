@@ -1,0 +1,17 @@
+[package]
+name = "Flux-Updater-RS"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.41", features = ["full"] }
+reqwest = { version = "0.12.24", features = ["json", "stream"] }
+futures-util = "0.3"
+eframe = "0.33.0"
+egui = "0.33.0"
+dirs = "6.0.0"
+zip = "6.0.0"
+image = { version = "0.25.1", features = ["ico"] }
+
+[build-dependencies]
+winresource = "0.1.20"
